@@ -5,6 +5,8 @@
 .. |PythonVersion| image:: https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue
 .. _PythonVersion: https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue
 
+.. image:: https://moscowchanges.ru/wp-content/uploads/2017/08/1483011562-5c7103eb8c8cbbfa4460be44493a5b8a.frontend-article-cover-large.jpg
+
 Проект по банкам в рамках курса "Управление рисками в финансовых учреждениях"
 -----------------------------------------------------------------------------------
 
