@@ -30,5 +30,5 @@
 - Папка ``grouping files``, в которой хранятся таблички Марины Александровны для группировки форм 101 и 102 в зависимости от изменений плана счетов в разные годы.
 
 Дополнительные библиотеки, которые нужны для работы с проектом и не поставляются с ``Python``/``Anaconda`` по умолчанию, вы можете поставить командой 
-``pip install requests pyunpack dbfread beautifulsoup4``
+``pip install tqdm requests pyunpack dbfread beautifulsoup4``
 
