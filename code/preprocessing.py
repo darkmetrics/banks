@@ -366,3 +366,175 @@ def group(data:pd.DataFrame,
     print('Finished.')
     
     return df
+
+def preprocess_df(data : pd.DataFrame, form : str) -> pd.DataFrame:
+    """
+    Returns dataframe with columns for code, level and name of the entry
+    
+    Parameters:
+    -----------
+    data:pd.DataFrame
+        DataFrame to process. Must be one of the pages from Деревья
+    """
+    if form == "BS":
+        data = data[data.columns[0:3]]
+    elif form == "PNL":
+        data = data[data.columns[[1,2,4]]]
+    else:
+        print(f"There is no such form as {form} implemented")
+    data.columns = ["code", "level", "name"]
+    data = data[~data.code.isnull()]
+    return data
+
+def create_level_separating_indices(data : pd.DataFrame, level : int) -> np.array:
+    """
+    Returns array of indices of level borders
+    
+    Parameters:
+    -----------
+    data:pd.DataFrame
+        Prerocessed DataFrame from preprocess_df function
+    
+    level:int
+        Level of aggregation 
+    """
+    separating_indices = (data[data.level == level]).index.values
+    separating_indices = np.append(separating_indices, data.index.values[-1])
+    return separating_indices
+
+def create_level_names(data : pd.DataFrame, level : int) -> np.array:
+    """
+    Returns array of names of groups
+    
+    Parameters:
+    -----------
+    data:pd.DataFrame
+        Prerocessed DataFrame from preprocess_df function
+    
+    level:int
+        Level of aggregation 
+    """
+    separating_indices = (data[data.level == level]).index.values
+    group_names = list(data.name[separating_indices])
+    return group_names
+
+def limit_df_by_level(data : pd.DataFrame, form : str) -> pd.DataFrame:
+    """
+    Returns DataFrame with only the lowest-level observations (4 for BS, 8 for PNL)
+    
+    Parameters:
+    -----------
+    data:pd.DataFrame
+        Prerocessed DataFrame from preprocess_df function
+    
+    form:str
+        Type of the form. "BS" for balance sheet, "PNL" for profit and loss
+    """
+    if form == "BS":
+        lowest_level = 4
+    elif form == "PNL":
+        lowest_level = 8
+    data_low_level = data[data.level == lowest_level]
+    return data_low_level
+
+def create_tuples_from_separating_indices(separating_indices : list) -> list:
+    """
+    Returns list tuples with beginning and ending indices of each group
+    
+    Parameters:
+    -----------
+    separating_indices:list
+        list of indices of the group separators 
+
+    """
+    separating_indices_shifted = np.roll(separating_indices, 1)
+    separating_tuples = list(zip(separating_indices_shifted, separating_indices))
+    separating_tuples.remove(separating_tuples[0])
+    return separating_tuples
+
+def zip_all_names_and_boundaries(group_names : list, separating_tuples : list) -> dict:
+    """
+    Returns dictionary of format {group name: (starting index, ending index)}
+    
+    Parameters:
+    -----------
+    group_names:list
+        list of indices of the group names
+    separating_tuples:list
+        list of tuples with beginning and ending values 
+
+    """
+    all_names_and_boundaries = dict(zip(group_names, separating_tuples))
+    return all_names_and_boundaries
+
+def create_group_dict(data : pd.DataFrame, name : str, all_names_and_boundaries : dict) -> dict:
+    """
+    Returns dictionary of format {group name: list of codes} for a particular name.
+    
+    Parameters:
+    -----------
+    data:pd.DataFrame
+        Prerocessed DataFrame from preprocess_df function
+    name:str
+        Name of the group
+    all_names_and_boundaries:dict
+        Dictionary of format {group name: (starting index, ending index)}
+    """
+    separating_mask = data.index.to_series().between(*all_names_and_boundaries[name])
+    trees_balance_old_between = data[separating_mask]
+    group_dict = {name : list(trees_balance_old_between.code)}
+    return group_dict
+
+def create_dictionary_from_name_and_level(data : pd.DataFrame, name : str, level : int, form : str) -> dict:
+    """
+    Returns dictionary of format {group name: list of codes} for a particular name, level, form from the raw data.
+    
+    Parameters:
+    -----------
+    data:pd.DataFrame
+        Raw data from Деревья
+    name:str
+        Name of the group
+    level:int
+        Level of aggregation 
+    form:str
+        Type of the form. "BS" for balance sheet, "PNL" for profit and loss
+    """
+    data = preprocess_df(data, form)
+    separating_indices = create_level_separating_indices(data, level)
+    group_names = create_level_names(data, level)
+    data_low_level = limit_df_by_level(data, form)
+    separating_tuples = create_tuples_from_separating_indices(separating_indices)
+    all_names_and_boundaries = zip_all_names_and_boundaries(group_names, separating_tuples)
+    group_dictionary = create_group_dict(data_low_level, name, all_names_and_boundaries)
+    return group_dictionary
+
+def create_all_dictionaries_for_one_sheet(data : pd.DataFrame, level_pnl : str, level_bs : str, form : str) -> list:
+    """
+    Returns list dictionary of format {group name: list of codes} for a particular name, level, form from the raw data, 
+    FOR ALL THE GROUPS OF DESIRED LEVEL IN ONE SHEET.
+    
+    Parameters:
+    -----------
+    data:pd.DataFrame
+        Raw data from Деревья
+    name:str
+        Name of the group
+    level_pnl:int
+        Level of aggregation for PNL
+    level_bs:int
+        Level of aggregation for BS
+    form:str
+        Type of the form. "BS" for balance sheet, "PNL" for profit and loss
+    """
+    if form == "BS":
+        level = level_bs
+    elif form == "PNL":
+        level = level_pnl
+    else:
+        print(f"There is no such form as {form} implemented yet, please choose either 'PNL' or 'BS'")
+        return None
+    group_names = create_level_names(preprocess_df(data, form), level)
+    all_dicts = [None]*len(group_names)
+    all_dicts = [create_dictionary_from_name_and_level(data, name, level, form) for name in group_names]
+    return all_dicts
