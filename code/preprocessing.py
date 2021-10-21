@@ -369,7 +369,7 @@ def group(data:pd.DataFrame,
 
 def preprocess_df(data : pd.DataFrame, form : str) -> pd.DataFrame:
     """
-    Returns dataframe with columns for code, level and name of the entry
+    Returns dataframe with columns for code, level, name and sign (P or A) of the entry
     
     Parameters:
     -----------
@@ -377,12 +377,12 @@ def preprocess_df(data : pd.DataFrame, form : str) -> pd.DataFrame:
         DataFrame to process. Must be one of the pages from Деревья
     """
     if form == "BS":
-        data = data[data.columns[0:3]]
+        data = data[data.columns[0:4]]
     elif form == "PNL":
-        data = data[data.columns[[1,2,4]]]
+        data = data[data.columns[[1,2,4,6]]]
     else:
         print(f"There is no such form as {form} implemented")
-    data.columns = ["code", "level", "name"]
+    data.columns = ["code", "level", "name", "sign"]
     data = data[~data.code.isnull()]
     return data
 
@@ -507,7 +507,103 @@ def create_dictionary_from_name_and_level(data : pd.DataFrame, name : str, level
     separating_tuples = create_tuples_from_separating_indices(separating_indices)
     all_names_and_boundaries = zip_all_names_and_boundaries(group_names, separating_tuples)
     group_dictionary = create_group_dict(data_low_level, name, all_names_and_boundaries)
-    return group_dictionary
+    group_dictionary_sorted = sort_one_dictionary(group_dictionary, data_low_level)
+    return group_dictionary_sorted
+
+def sort_one_dictionary(dictionary : dict, data : pd.DataFrame) -> dict:
+    """
+    Returns dictionary of format {group name : {"A" : [codes], "P" : [codes]}}
+    
+    Parameters:
+    -----------
+    dictionary:dict
+        dictionary of format {group name: list of codes}
+    data:pd.DataFrame
+        Lower-level data
+    """
+    
+    name = list(dictionary.keys())[0]
+    codes = pd.Series(np.array(list(dictionary.values()))[0])
+
+    end_index = check_location(index_values = codes, data = data)
+    if end_index == "EmptyIndex":
+        empty_dictionary = {name : {"A" : [],
+                                    "P" : []}}
+        return     
+    checker_vectorized = np.vectorize(check_code_is_positive, excluded = ["data", "end_index"])
+
+    positive_mask = pd.Series(
+                                checker_vectorized(code = codes, data = data, end_index = end_index)
+                                                                                                )
+    negative_mask = ~positive_mask
+    
+    positive_codes = codes[positive_mask]
+    negative_codes = codes[negative_mask]
+    
+    new_dictionary = {name : {"A" : list(positive_codes),
+                              "P" : list(negative_codes)}}
+    return(new_dictionary)
+
+
+def check_code_is_positive(code : str, end_index : int,  data : pd.DataFrame) -> bool:
+    """
+    Returns True if one code is positive and False if it is negative
+    
+    Parameters:
+    -----------
+
+    code:str
+        A code
+    end_index:int
+        Ending index of the slice in the general dataframe, which corresponds to the dictionary
+    data:pd.DataFrame
+        Preprocessed data from preprocess_df
+    """
+    if end_index == "EmptyIndex":
+        return "EmptyIndex"
+    if len(data[data.code == code].sign) == 0:
+        return False
+    elif len(data[data.code == code].sign) > 1:
+        index_values = data[data.code == code].index
+        index_ranges = index_values - end_index
+        index_ranges = index_ranges[index_ranges <= 0]
+        index_closest_range = np.max(index_ranges)
+        index_needed = index_closest_range + end_index
+        code_type = data[data.index == index_needed].sign.item()
+    else:
+        code_type = data[data.code == code].sign.item()
+        
+
+    if code_type == "A":
+        return True
+    elif code_type == "P":
+        return False
+    
+def check_location(index_values : np.array,  data : pd.DataFrame) -> int:
+    """
+    Takes an array of integers (the values of dictionary). 
+    Locates them in the file, finds ending index, returns it as an integer. 
+    
+    Parameters:
+    -----------
+    index_values:np.array
+        An array of integers for indices of a code
+    data:pd.DataFrame
+        Preprocessed data from preprocess_df
+    """
+    if len(index_values) == 0:
+        return "EmptyIndex"
+    index_values = pd.Series(index_values).apply(str)
+
+    values_in_values = data.code.apply(str).isin(index_values)
+    count_consequtive_values = values_in_values * (values_in_values.groupby((values_in_values !=
+                                                           values_in_values.shift()).cumsum()).cumcount() + 1)
+    length_of_dictionary = len(index_values)
+
+    end_index = count_consequtive_values[count_consequtive_values == length_of_dictionary].index[0]
+
+    return end_index
+    
 
 def create_all_dictionaries_for_one_sheet(data : pd.DataFrame, level_pnl : str, level_bs : str, form : str) -> list:
     """
