@@ -1,4 +1,4 @@
-code/.ipynb_checkpoints 
-code/__pycache__
+code/.ipynb_checkpoints/
+code/__pycache__/
 poetry.lock
 pyproject.toml
