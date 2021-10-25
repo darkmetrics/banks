@@ -345,8 +345,8 @@ def group(data:pd.DataFrame,
 
     if isinstance(aggschema, dict):
         newdict = {y:x[0] for x in aggschema.items() for y in x[1]}
-        aggschema = pd.DataFrame({'new_code': newdict.values(),
-                                  account_cols[form]: newdict.keys()})
+        aggschema = pd.DataFrame({'new_code': list(newdict.values()),
+                                  account_cols[form]: list(newdict.keys())})
     elif isinstance(aggschema, pd.DataFrame):
         aggschema.columns=['new_code', account_cols[form]]
 
