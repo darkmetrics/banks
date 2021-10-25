@@ -136,7 +136,11 @@ def dbf2df(filepath: str, encoding:str) -> pd.DataFrame:
     # if there is no 'DT' column with date
     if 'DT' not in df.columns:
         # get date from folder name
-        date = str(filepath).split('\\')[-2]
+        try:
+            date = str(filepath).split('\\')[-2]
+        # path with ordinary slash if working on Linux 
+        except IndexError:
+            date = str(filepath).split('/')[-2]
         df['DT'] = pd.to_datetime(date)
     return df
     
