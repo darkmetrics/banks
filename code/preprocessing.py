@@ -14,6 +14,8 @@ from multiprocessing import Pool
 from dbfread import DBF
 from typing import Union
 
+import re
+
 
 def load_and_unpack(url:str,
                     file_name:str, 
@@ -351,7 +353,6 @@ def group(data:pd.DataFrame,
         aggschema.columns=['new_code', account_cols[form]]
 
     print('Grouping and aggregating data. Please be patient...')
-
     df = pd.merge(left=data.reset_index(), 
                   right=aggschema, 
                   how='left', 
@@ -638,3 +639,122 @@ def create_all_dictionaries_for_one_sheet(data : pd.DataFrame, level_pnl : str, 
     all_dicts = [None]*len(group_names)
     all_dicts = [create_dictionary_from_name_and_level(data, name, level, form) for name in group_names]
     return all_dicts
+
+
+
+#способ добраться до положительного словаря выглядит так:
+#list(all_dictionaries_dict["BS_old"][0].values())[0]["A"]
+#здесь BS_old указывает на название листа группировки, первый ноль - номер группированного счета, второй ноль технический, 
+#"A" - для положительного кода
+
+def get_numbers(string : str) -> str:
+    if len(re.findall("\d+", string)) > 0:
+        return re.findall("\d+", string)[0]
+    else:
+        return ""
+
+
+def get_numbers_list(list_of_strings):
+    get_numbers_vector = np.vectorize(get_numbers)
+    list_of_numbers = get_numbers_vector(list_of_strings)
+    list_of_numbers = list(list_of_numbers)
+    return list_of_numbers
+    
+def positive_negative_dictionaries(big_dict : dict, form_name : str) -> tuple:
+    
+    """
+    Returns a tuple, where first element is a dictionary of format {account : positive codes} and second element is {account : negative codes}. It also removes non-digital symbols in codes. !!! in future it seems desirable to separate this functionality to a separate object !!!
+    
+    Parameters:
+    -----------
+    big_dict::dict
+        A dictionary created by create_all_dictionaries_for_one_sheet()
+    form_name::str
+        "BS", "BS_old", "PNL", "PNL_old", "PNL_very_old"
+    """
+    
+
+    this_form_grouping_dictionary_positive = {}
+    this_form_grouping_dictionary_negative = {}
+    for number_of_account in range(len(big_dict[form_name])):
+        if big_dict[form_name][number_of_account] is not None:
+            name_of_account = list(big_dict[form_name][number_of_account].keys())[0]
+            positive_value = list(big_dict[form_name][number_of_account].values())[0]["A"]
+            negative_value = list(big_dict[form_name][number_of_account].values())[0]["P"]
+
+            positive_value = list(map(str, positive_value))
+            negative_value = list(map(str, negative_value))
+
+            if len(positive_value) > 0:
+                positive_value = get_numbers_list(positive_value)
+            if len(negative_value) > 0:
+                negative_value = get_numbers_list(negative_value)
+            this_form_grouping_dictionary_positive[name_of_account] = positive_value
+            this_form_grouping_dictionary_negative[name_of_account] = negative_value
+    return this_form_grouping_dictionary_positive, this_form_grouping_dictionary_negative
+    
+def subset_df_to_dates(data : pd.DataFrame, form_name : str) -> pd.DataFrame:
+    """
+    Returns a table with only the dates to which the particular grouping form is applicable
+    
+    Parameters:
+    -----------
+    data::pd.DataFrame
+        Data for the banks. Must contain dates in index
+    form_name::str
+        "BS", "BS_old", "PNL", "PNL_old", "PNL_very_old"
+    """
+    
+    border_dates = {"BS" : lambda date: date >= "2017-01-01", 
+                    "BS_old" : lambda date: date < "2017-01-01",
+                    "PNL" : lambda date: date >= "2016-01-01",
+                    "PNL_old" : lambda date: (date < "2016-01-01")&(date >= "2008-01-01"), 
+                    "PNL_very_old" : lambda date: date < "2008-01-01"}
+
+    this_form = data[border_dates[form_name](data.index)]
+    
+    return this_form
+
+def group_one_form(data : pd.DataFrame, form_name : str, big_dict : dict) -> pd.DataFrame:
+    """
+    Returns a table grouped in accordance with the grouping scheme provided in "form_name"
+    
+    Parameters:
+    -----------
+    data::pd.DataFrame
+        Data for the banks. Must contain dates in index
+    big_dict::dict
+        A dictionary created by create_all_dictionaries_for_one_sheet()
+    form_name::str
+        "BS", "BS_old", "PNL", "PNL_old", "PNL_very_old"
+    """
+    
+    #получим позитивный и негативный словари для BS_old
+    grouping_dictionary_positive, grouping_dictionary_negative = \
+                                    positive_negative_dictionaries(big_dict, form_name)
+    #делаем группировку для старого формата 101 формы
+    data_subset = subset_df_to_dates(data, form_name)
+    if form_name in ["BS", "BS_old"]:
+        data_subset.NUM_SC = data_subset.NUM_SC.apply(str)
+    else:
+        data_subset.CODE = data_subset.CODE.apply(str)
+        
+    if form_name in ["BS", "BS_old"]:
+        positive_grouping = group(data=data_subset, aggschema=grouping_dictionary_positive, form=101)
+        negative_grouping = group(data=data_subset, aggschema=grouping_dictionary_negative, form=101)
+    else:
+        positive_grouping = group(data=data_subset, aggschema=grouping_dictionary_positive, form=102)
+        negative_grouping = group(data=data_subset, aggschema=grouping_dictionary_negative, form=102)    
+        
+    #Теперь объединим позитивные и негативные таблицы, заполним пропуски (там, где коды оказались только одного знака) нулями и просуммируем
+    
+    grouped_table = positive_grouping.merge(negative_grouping, on = ["REGN", "new_code", "DT"], how = "outer",
+                                                 suffixes = ("_positive", "_negative"))
+    
+    grouped_table = grouped_table.fillna(0)
+    if form_name in ["BS", "BS_old"]:
+        grouped_table["IITG"] = grouped_table.IITG_positive - grouped_table.IITG_negative
+    else:
+        grouped_table["IITG"] = grouped_table.SIM_ITOGO_positive - grouped_table.SIM_ITOGO_negative
+        
+    return grouped_table
