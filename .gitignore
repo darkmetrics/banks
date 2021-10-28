@@ -2,3 +2,4 @@
 **/*pycache*
 poetry.lock
 pyproject.toml
+.vscode/
