@@ -58,7 +58,7 @@ test_group_df.index = to_datetime(test_group_df['DT'])
 test_group_df.drop(columns='DT', inplace=True)
 
 # get grouping dict
-with open('parameters.json', mode='r') as f:
+with open('grouping_dict.json', mode='r') as f:
     dict_of_dicts = json.load(f)
 
 bs_dict = dict_of_dicts['BS_old']
