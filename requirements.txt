@@ -11,3 +11,4 @@ seaborn>=0.11.2
 jupyter>=1.0.0
 unrar>=0.4
 patool>=1.12
+openpyxl==3.0.9
