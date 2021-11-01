@@ -388,7 +388,7 @@ def preprocess_df(data : pd.DataFrame, form : str) -> pd.DataFrame:
     else:
         print(f"There is no such form as {form} implemented")
     data.columns = ["code", "level", "name", "sign"]
-    data = data[~data.code.isnull()]
+    data = data[~data.name.isnull()]
     return data
 
 def create_level_separating_indices(data : pd.DataFrame, level : int) -> np.array:
@@ -439,7 +439,12 @@ def limit_df_by_level(data : pd.DataFrame, form : str) -> pd.DataFrame:
         lowest_level = 4
     elif form == "PNL":
         lowest_level = 8
-    data_low_level = data[data.level == lowest_level]
+        
+    data_low_level = data[(data.level == lowest_level)|
+                          (data.level.isnull())]
+    
+    data_low_level = data_low_level[data_low_level.code.isnull() == False]
+    
     return data_low_level
 
 def create_tuples_from_separating_indices(separating_indices : list) -> list:
@@ -670,7 +675,7 @@ def positive_negative_dictionaries(big_dict : dict, form_name : str) -> tuple:
     big_dict::dict
         A dictionary created by create_all_dictionaries_for_one_sheet()
     form_name::str
-        "BS", "BS_old", "PNL", "PNL_old", "PNL_very_old"
+        "BS_new", "BS_old", "PNL", "PNL_old", "PNL_very_old"
     """
     
 
@@ -705,7 +710,7 @@ def group_one_form(data : pd.DataFrame, form_name : str, big_dict : dict) -> pd.
     big_dict::dict
         A dictionary created by create_all_dictionaries_for_one_sheet()
     form_name::str
-        "BS", "BS_old", "PNL", "PNL_old", "PNL_very_old"
+        "BS_new", "BS_old", "PNL", "PNL_old", "PNL_very_old"
     """
     
     #получим позитивный и негативный словари для BS_old
@@ -713,12 +718,12 @@ def group_one_form(data : pd.DataFrame, form_name : str, big_dict : dict) -> pd.
                 positive_negative_dictionaries(big_dict, form_name)
     #делаем группировку для старого формата 101 формы
     
-    if form_name in ["BS", "BS_old"]:
+    if form_name in ["BS_new", "BS_old"]:
         data.NUM_SC = data.NUM_SC.apply(str)
     else:
         data.CODE = data.CODE.apply(str)
         
-    if form_name in ["BS", "BS_old"]:
+    if form_name in ["BS_new", "BS_old"]:
         positive_grouping = group(data=data, 
                                   aggschema=grouping_dictionary_positive, 
                                   form=101)
@@ -742,7 +747,7 @@ def group_one_form(data : pd.DataFrame, form_name : str, big_dict : dict) -> pd.
     
     grouped_table = grouped_table.fillna(0)
     
-    if form_name in ["BS", "BS_old"]:
+    if form_name in ["BS_new", "BS_old"]:
         grouped_table["IITG"] = grouped_table.IITG_positive - grouped_table.IITG_negative
     else:
         grouped_table["IITG"] = grouped_table.SIM_ITOGO_positive - grouped_table.SIM_ITOGO_negative
