@@ -539,9 +539,10 @@ def sort_one_dictionary(dictionary : dict, data : pd.DataFrame) -> dict:
     if end_index == "EmptyIndex":
         empty_dictionary = {name : {"A" : [],
                                     "P" : []}}
-        return     
+        return empty_dictionary
     checker_vectorized = np.vectorize(check_code_is_positive, excluded = ["data", "end_index"])
 
+    data.code = data.code.apply(str)
     positive_mask = pd.Series(
                                 checker_vectorized(code = codes, data = data, end_index = end_index)
                                                                                                 )
