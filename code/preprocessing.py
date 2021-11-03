@@ -570,6 +570,7 @@ def check_code_is_positive(code : str, end_index : int,  data : pd.DataFrame) ->
     data:pd.DataFrame
         Preprocessed data from preprocess_df
     """
+    code = str(code)
     if end_index == "EmptyIndex":
         return "EmptyIndex"
     if len(data[data.code == code].sign) == 0:
@@ -654,6 +655,8 @@ def create_all_dictionaries_for_one_sheet(data : pd.DataFrame, level_pnl : str, 
 #"A" - для положительного кода
 
 def get_numbers(string : str) -> str:
+    if len(re.findall("_", string)) > 0:
+        return "REMOVED"
     if len(re.findall("\d+", string)) > 0:
         return re.findall("\d+", string)[0]
     else:
@@ -714,10 +717,8 @@ def group_one_form(data : pd.DataFrame, form_name : str, big_dict : dict) -> pd.
         "BS_new", "BS_old", "PNL", "PNL_old", "PNL_very_old"
     """
     
-    #получим позитивный и негативный словари для BS_old
     grouping_dictionary_positive, grouping_dictionary_negative = \
                 positive_negative_dictionaries(big_dict, form_name)
-    #делаем группировку для старого формата 101 формы
     
     if form_name in ["BS_new", "BS_old"]:
         data.NUM_SC = data.NUM_SC.apply(str)
