@@ -755,3 +755,115 @@ def group_one_form(data : pd.DataFrame, form_name : str, big_dict : dict) -> pd.
         grouped_table["IITG"] = grouped_table.SIM_ITOGO_positive - grouped_table.SIM_ITOGO_negative
         
     return grouped_table
+
+
+class create_name_masks_container():
+    
+    def __init__(self, names_levels_pnl, names_levels_bs, pnl, bs, pnl_level, bs_level, additional_variables = []):
+    #currently not all the names in the dictionary are real columns
+    #luckily, not much of them
+    #if I will ever fix this bug, I will deprecate the code below
+        if (hasattr(pnl_level, '__len__') == False):
+            self.pnl_mask = [i for i in np.array(names_levels_pnl[str(pnl_level)]) if i in np.array(df_pnl.columns)]
+        else: 
+            self.pnl_mask = []
+            for level in pnl_level:
+                self.pnl_mask = self.pnl_mask + [i for i in np.array(names_levels_pnl[str(level)]) if i in np.array(df_pnl.columns)]
+
+        if (hasattr(bs_level, '__len__') == False):
+            self.bs_mask = [i for i in np.array(names_levels_bs[str(bs_level)]) if i in np.array(df_bs.columns)]
+        else: 
+            self.bs_mask = []
+            for level in bs_level:
+                self.bs_mask = self.bs_mask + [i for i in np.array(names_levels_bs[str(level)]) if i in np.array(df_bs.columns)]
+
+        self.pnl_encoding = [f"PNL{str(i)}" for i in range(1, len(self.pnl_mask) + 1)]
+        self.bs_encoding = [f"BS{str(i)}" for i in range(1, len(self.bs_mask) + 1)]
+        self.additional_variables = additional_variables
+    
+    def full_true_mask(self):
+        return ["DT", "REGN"] + self.additional_variables + self.pnl_mask + self.bs_mask
+    
+    def pnl_index_mask(self):
+        return ["DT", "REGN"] + self.additional_variables + self.pnl_mask
+    
+    def bs_index_mask(self):
+        return ["DT", "REGN"] + self.additional_variables + self.bs_mask
+    
+    def encoding_mask(self):
+        return ["DT", "REGN"] + self.additional_variables + self.pnl_encoding + self.bs_encoding
+    
+class create_days_container():
+    
+    def __init__(self, target_days):
+        
+        if (hasattr(target_days, '__len__') == False):
+            self.target_days = [target_days]
+        else:
+            self.target_days = target_days
+        
+        self.target_names = [""]*len(self.target_days)
+        for days_index in range(len(self.target_days)):
+            self.target_names[days_index] = f"DefaultIn{self.target_days[days_index]}Days"
+        
+    def compare_days(self, number_of_days_real, number_of_days_benchmark):
+        if pd.isnull(number_of_days_real):
+            return 0
+        else:
+            return (int(number_of_days_real.days) <= int(number_of_days_benchmark))*1
+        
+    def create_target_columns(self, df, days_to_default_column = "DaysToDefault"):
+        days_to_default_column = df[days_to_default_column]
+
+        for days, days_name in zip(self.target_days, self.target_names):
+            df[days_name] = days_to_default_column.apply(self.compare_days, number_of_days_benchmark = days)
+        return df
+    
+    
+def prepare_df_to_modelling(pnl, bs, defaults, name_masks, target_days, fillnan = 0):
+
+    #create bs and pnl of needed level
+    restricted_pnl = pnl[name_masks_container.pnl_index_mask()]
+    restricted_bs = bs[name_masks_container.bs_index_mask()]
+    
+    #count NaN in each line
+    restricted_bs["BSNan"] = restricted_bs.isnull().sum(axis = 1)
+    restricted_pnl["PNLNan"] = restricted_pnl.isnull().sum(axis = 1)
+    if fillnan == fillnan:
+        restricted_pnl.fillna(fillnan, inplace = True)
+        restricted_bs.fillna(fillnan, inplace = True)
+    
+    #merge bs and pnl
+    merged_reporting = restricted_bs.merge(restricted_pnl, on = ["DT", "REGN"], how = "outer")
+    merged_reporting = merged_reporting[name_masks_container.full_true_mask() + ["PNLNan", "BSNan"]]
+    merged_reporting.columns = name_masks_container.encoding_mask() + ["PNLNan", "BSNan"] 
+
+    #merge with defaults
+    def func2(x):
+        if type(x) == type("str"):
+            return datetime.datetime.strptime(str(x), "%d.%m.%Y") 
+        else:
+            return x
+        
+    merged_reporting.REGN = merged_reporting.REGN.apply(str)
+    
+    pd.options.mode.chained_assignment = None
+    defaults = defaults[defaults.DefaultType != "ликв."]
+    defaults.DefaultDate = defaults.DefaultDate.apply(func2)
+    merged_reporting = merged_reporting.merge(defaults, how = "left", on = "REGN")
+
+    merged_reporting["DaysToDefault"] = merged_reporting.DefaultDate - merged_reporting.DT
+    days_container_instance = create_days_container(target_days)
+
+    merged_reporting = days_container_instance.create_target_columns(merged_reporting)
+    
+    not_needed_columns = np.array(defaults.columns)
+    not_needed_columns = not_needed_columns[not_needed_columns != "REGN"]
+    merged_reporting.drop(list(not_needed_columns) + ["DaysToDefault"], axis = 1, inplace = True)
+    
+    merged_reporting["Year"] = merged_reporting.DT.apply(lambda x: x.year)
+    merged_reporting["Month"] = merged_reporting.DT.apply(lambda x: x.month)
+    
+    merged_reporting = merged_reporting.sort_values(by = ["REGN", "DT"])
+    merged_reporting.fillna(method = "ffill", inplace = True)
+    return merged_reporting
