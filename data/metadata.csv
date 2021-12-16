@@ -1,0 +1,26 @@
+,Название,Краткое название,Содержание
+0,CapitalAdequacy_norm,n_1_0,Достаточность капитала
+1,LiquidityMonth_norm,n3,Норматив текущей ликвидности
+2,LiquidityDay_norm,n2,Норматив мгновенной ликвидности
+3,LiquidityLong_norm,n4,Норматив долгосрочной ликвидности
+4,CreditsToInsidersCoefficient_norm,n_10_1,Норматив совокупной величины риска по инсайдерам банка
+5,ReservesChange,reserv_chng,Изменение резрвов за период
+6,EquityToImmobilizedAssets,equity_immobil,Отношение капитала к иммобилизованным активам
+7,CreditsReturnCorporates,corp_loan,Ставки по корпоративным кредитам
+8,DepositsInterestCorporates,retail_depo,Ставки по депозитам для корпоратов
+9,CreditsReturnRetail,retail_loan,Ставки по розничным кредитам
+10,DepositsInterestRetail,retail_depo,Ставки по розничным депозитам
+11,CostOfRisk,cor,Стоимость риска
+12,InterbankShareInLiabs,mbk_share,Доля межбанковских кредитов
+13,ownership_state,owner,Признак государственного банка
+14,orm_public,public,Признак публичности
+15,region_notmoscow,notmoscow,Региональные банки
+16,CreditsCorporates_Me,corp_loan_abs,Корпоративные кредиты
+17,CreditsRetail_Me,retail_loans_abs,Розничные кредиты
+18,DepositsRetail_Me,retail_depo_abs,Розничные депозиты
+19,DepositsCorporates_Me,corp_depo_abs,Корпоративные депозиты
+20,IncomeRetail_Me,retail_inc,Процентный доход по кредитам выданным физическим лицам
+21,IncomeCorporates_Me,corp_inc,Процентный доход по кредитам выданным юридическим лицам
+22,ExpenditureRetail_Me,retail_cost,Процентные расходы по депозитам выданным физическим лицам
+23,ExpenditureCorporates_Me,corp_cost,Процентные расходы по депозитам выданным юридическим лицам
+24,ExpendituresReserves_Me,reserv_cost,Расходы на создание резервов
